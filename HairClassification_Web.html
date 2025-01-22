@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discover Your Hair Type</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.20.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.3/dist/teachablemachine-image.min.js"></script>
+    <style>
+        body {
+            font-family: 'Georgia', serif;
+            text-align: center;
+            background-color: #fff7e6;
+            margin: 0;
+            padding: 0;
+            color: #5a4033;
+        }
+        header {
+            background-color: #cc9966;
+            color: #fff;
+            padding: 1.5rem;
+            font-size: 2.5rem;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .main-container {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            margin-top: 20px;
+            gap: 20px;
+        }
+        video {
+            border: 2px solid #cc9966;
+            border-radius: 10px;
+            width: 60%;
+            max-width: 300px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+        #saved-image {
+            border: 2px solid #cc9966;
+            border-radius: 10px;
+            width: 60%;
+            max-width: 300px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        button, label {
+            padding: 15px 30px;
+            font-size: 1rem;
+            font-weight: bold;
+            color: white;
+            background-color: #cc9966;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover, label:hover {
+            background-color: #a37c50;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        .result {
+            margin-top: 30px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #5a4033;
+        }
+        .timer {
+            margin-top: 15px;
+            font-size: 1.2rem;
+            font-style: italic;
+            color: #8a6e5a;
+        }
+    </style>
+</head>
+<body>
+    <header>Discover Your Hair Type</header>
+
+    <div class="main-container">
+        <video id="camera" autoplay></video>
+        <img id="saved-image" src="" alt="Captured image will appear here." style="display: none;">
+    </div>
+
+    <div class="timer" id="timer">Time: 0ms</div>
+    <div class="controls">
+        <button id="capture">Capture Hair Type</button>
+        <label for="file-input">Upload Image</label>
+        <input type="file" id="file-input" accept="image/*">
+        <button id="reset">Reset</button>
+    </div>
+
+    <div class="result" id="result">Your hair type result will appear here.</div>
+
+    <script>
+        const URL = "https://teachablemachine.withgoogle.com/models/6IHIvGitz/"; 
+        const video = document.getElementById('camera');
+        const result = document.getElementById('result');
+        const timerDisplay = document.getElementById('timer');
+        const captureButton = document.getElementById('capture');
+        const resetButton = document.getElementById('reset');
+        const savedImage = document.getElementById('saved-image');
+        const fileInput = document.getElementById('file-input');
+        let model;
+        let captureMode = false;
+
+        async function loadModel() {
+            try {
+                const modelURL = `${URL}model.json`;
+                const metadataURL = `${URL}metadata.json`;
+                model = await tmImage.load(modelURL, metadataURL);
+                console.log("Model loaded successfully!");
+                startClassification();
+            } catch (error) {
+                console.error('Error loading model:', error);
+                result.innerText = 'Error loading model. Please try again later.';
+            }
+        }
+
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then((stream) => {
+                video.srcObject = stream;
+            })
+            .catch((err) => {
+                console.error("Error accessing the camera:", err);
+                result.innerText = 'Error accessing the camera. Please check permissions.';
+            });
+
+        async function startClassification() {
+            const classifyLoop = async () => {
+                if (!model || captureMode) return;
+                const startTime = performance.now();
+                const prediction = await model.predict(video);
+                const bestPrediction = prediction.reduce((best, p) => p.probability > best.probability ? p : best);
+                const endTime = performance.now();
+                result.innerText = `Hair Type: ${bestPrediction.className}`;
+                timerDisplay.innerText = `Time: ${(endTime - startTime).toFixed(2)}ms`;
+                requestAnimationFrame(classifyLoop);
+            };
+            classifyLoop();
+        }
+
+        async function captureFrame() {
+            if (!model) {
+                result.innerText = "Model not loaded yet.";
+                return;
+            }
+            captureMode = true;
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            savedImage.src = canvas.toDataURL('image/png');
+            savedImage.style.display = 'block';
+            const startTime = performance.now();
+            const prediction = await model.predict(video);
+            const bestPrediction = prediction.reduce((best, p) => p.probability > best.probability ? p : best);
+            const endTime = performance.now();
+            result.innerText = `Hair Type: ${bestPrediction.className}`;
+            timerDisplay.innerText = `Capture Time: ${(endTime - startTime).toFixed(2)}ms`;
+        }
+
+        function reset() {
+            captureMode = false;
+            result.innerText = "Your hair type result will appear here.";
+            timerDisplay.innerText = "Time: 0ms";
+            savedImage.src = "";
+            savedImage.style.display = 'none';
+        }
+
+        async function classifyUploadedImage(file) {
+            if (!model) {
+                result.innerText = "Model not loaded yet.";
+                return;
+            }
+            const img = new Image();
+            img.src = URL.createObjectURL(file);
+            img.onload = async () => {
+                const prediction = await model.predict(img);
+                const bestPrediction = prediction.reduce((best, p) => p.probability > best.probability ? p : best);
+                result.innerText = `Uploaded Hair Type: ${bestPrediction.className}`;
+                savedImage.src = img.src;
+                savedImage.style.display = 'block';
+            };
+        }
+
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                classifyUploadedImage(file);
+            }
+        });
+
+        captureButton.addEventListener('click', captureFrame);
+        resetButton.addEventListener('click', reset);
+
+        loadModel();
+    </script>
+</body>
+</html>
