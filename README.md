@@ -7,6 +7,7 @@
 4. Usage Instructions
 5. Model
 6. Code
+7. Website
 
 ---
 
@@ -82,4 +83,10 @@ The complete implementation is available in the provided HTML and JavaScript fil
 3. Predicting hair types for real-time video or uploaded images.
 
 For detailed code and explanations, refer to the main `index.html` file.
+
+
+---
+
+## Website
+http://127.0.0.1:5500/HairClassification_Web.html
 
